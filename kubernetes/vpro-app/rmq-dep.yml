@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vpromq01
+  name: testappmq01
   labels:
-    app: vpromq01
+    app: testappmq01
 spec:
   selector:
     matchLabels:
-      app: vpromq01
+      app: testappmq01
   replicas: 1
   template:
     metadata:
       labels:
-        app: vpromq01
+        app: testappmq01
     spec:
       containers:
-      - name: vpromq01
+      - name: testappmq01
         image: rabbitmq
         ports:
-        - name: vpromq01-port
+        - name: testappmq01-port
           containerPort: 15672
         env: 
          - name: RABBITMQ_DEFAULT_PASS

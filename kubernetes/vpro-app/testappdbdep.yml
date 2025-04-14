@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vprodb
+  name: testappdb
   labels:
-    app: vprodb
+    app: testappdb
 spec:
   selector:
     matchLabels:
-      app: vprodb
+      app: testappdb
   replicas: 1
   template:
     metadata:
       labels:
-        app: vprodb
+        app: testappdb
     spec:
       containers:
-      - name: vprodb
-        image: vprofile/vprofiledb 
+      - name: testappdb
+        image: testapp/testappdb 
         ports:
-        - name: vprodb-port
+        - name: testappdb-port
           containerPort: 3306
         env: 
          - name: MYSQL_ROOT_PASSWORD
@@ -28,5 +28,5 @@ spec:
                key: db-pass
 #        env:
 #         - name: MYSQL_ROOT_PASSWORD
-#           value: "vprodbpass"
+#           value: "testappdbpass"
 

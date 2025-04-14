@@ -1,29 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vproapp
+  name: testapp
   labels: 
-    app: vproapp
+    app: testapp
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: vproapp
+      app: testapp
   template:
     metadata:
       labels:
-        app: vproapp
+        app: testapp
     spec:
       containers:
-      - name: vproapp
-        image: vprofile/vprofileapp
+      - name: testapp
+        image: testapp/testapp
         ports:
-        - name: vproapp-port
+        - name: testapp-port
           containerPort: 8080
       initContainers:
       - name: init-mydb
         image: busybox
-        command: ['sh', '-c', 'until nslookup vprodb.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mydb; sleep 2; done;']
+        command: ['sh', '-c', 'until nslookup testappdb.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mydb; sleep 2; done;']
       - name: init-memcache
         image: busybox
-        command: ['sh', '-c', 'until nslookup vprocache01.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mydb; sleep 2; done;']
+        command: ['sh', '-c', 'until nslookup testappcache01.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mydb; sleep 2; done;']
