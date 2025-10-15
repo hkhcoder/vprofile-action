@@ -1,122 +1,61 @@
 pipeline {
-    
-	agent any
-/*	
-	tools {
-        maven "maven3"
-	
-    }
-*/	
+    agent any  // Run on any available agent (can be restricted to master if you prefer)
+
     environment {
-        NEXUS_VERSION = "nexus3"
-        NEXUS_PROTOCOL = "http"
-        NEXUS_URL = "172.31.40.209:8081"
-        NEXUS_REPOSITORY = "vprofile-release"
-	NEXUS_REPO_ID    = "vprofile-release"
-        NEXUS_CREDENTIAL_ID = "nexuslogin"
-        ARTVERSION = "${env.BUILD_ID}"
-    }
-	
-    stages{
-        
-        stage('BUILD'){
-            steps {
-                sh 'mvn clean install -DskipTests'
-            }
-            post {
-                success {
-                    echo 'Now Archiving...'
-                    archiveArtifacts artifacts: '**/target/*.war'
-                }
-            }
-        }
-
-	stage('UNIT TEST'){
-            steps {
-                sh 'mvn test'
-            }
-        }
-
-	stage('INTEGRATION TEST'){
-            steps {
-                sh 'mvn verify -DskipUnitTests'
-            }
-        }
-		
-        stage ('CODE ANALYSIS WITH CHECKSTYLE'){
-            steps {
-                sh 'mvn checkstyle:checkstyle'
-            }
-            post {
-                success {
-                    echo 'Generated Analysis Result'
-                }
-            }
-        }
-
-        stage('CODE ANALYSIS with SONARQUBE') {
-          
-		  environment {
-             scannerHome = tool 'sonarscanner4'
-          }
-
-          steps {
-            withSonarQubeEnv('sonar-pro') {
-               sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=vprofile \
-                   -Dsonar.projectName=vprofile-repo \
-                   -Dsonar.projectVersion=1.0 \
-                   -Dsonar.sources=src/ \
-                   -Dsonar.java.binaries=target/test-classes/com/visualpathit/account/controllerTest/ \
-                   -Dsonar.junit.reportsPath=target/surefire-reports/ \
-                   -Dsonar.jacoco.reportsPath=target/jacoco.exec \
-                   -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml'''
-            }
-
-            timeout(time: 10, unit: 'MINUTES') {
-               waitForQualityGate abortPipeline: true
-            }
-          }
-        }
-
-        stage("Publish to Nexus Repository Manager") {
-            steps {
-                script {
-                    pom = readMavenPom file: "pom.xml";
-                    filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
-                    echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
-                    artifactPath = filesByGlob[0].path;
-                    artifactExists = fileExists artifactPath;
-                    if(artifactExists) {
-                        echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version ${pom.version} ARTVERSION";
-                        nexusArtifactUploader(
-                            nexusVersion: NEXUS_VERSION,
-                            protocol: NEXUS_PROTOCOL,
-                            nexusUrl: NEXUS_URL,
-                            groupId: pom.groupId,
-                            version: ARTVERSION,
-                            repository: NEXUS_REPOSITORY,
-                            credentialsId: NEXUS_CREDENTIAL_ID,
-                            artifacts: [
-                                [artifactId: pom.artifactId,
-                                classifier: '',
-                                file: artifactPath,
-                                type: pom.packaging],
-                                [artifactId: pom.artifactId,
-                                classifier: '',
-                                file: "pom.xml",
-                                type: "pom"]
-                            ]
-                        );
-                    } 
-		    else {
-                        error "*** File: ${artifactPath}, could not be found";
-                    }
-                }
-            }
-        }
-
-
+        DOCKER_IMAGE = "darsan03/tomcat"
+        DOCKER_TAG = "9.0-${BUILD_NUMBER}"
     }
 
+    tools {
+        maven 'maven'  // Assuming Maven is already configured in Jenkins
+    }
 
+    stages {
+        stage('Checkout Code') {
+            steps {
+                echo "🔄 Cloning the repository from GitHub..."
+                // Using the SSH URL with the credentialsId for SSH key authentication
+                git url: 'https://github.com/hkhcoder/vprofile-action.git', branch: 'main', credentialsId: 'github-ssh-credentials'
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
+                echo "🔧 Building the project with Maven..."
+                sh 'mvn clean package -DskipTests -e -X'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "🐳 Building Docker image..."
+                sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+            }
+        }
+
+        stage('Push Docker Image to DockerHub') {
+            steps {
+                echo "📤 Pushing Docker image to DockerHub..."
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Pipeline succeeded — Image pushed to DockerHub!'
+        }
+        failure {
+            echo '❌ Pipeline failed — Check the logs!'
+        }
+    }
 }
